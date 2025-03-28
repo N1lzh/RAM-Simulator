@@ -1,0 +1,1 @@
+data class OperandResult(val index: Int, val value: Int)

@@ -8,18 +8,29 @@ import model.Instruction
 import model.Operand
 import util.Register
 
+/**
+ * A simulator for the RAM.
+ *
+ * @param input The input values to use.
+ * @param raw The raw instructions to compile.
+ * @param logging Whether to log the state of the simulator.
+ * @param timeout The timeout between logging in seconds.
+ */
 class RAMSimulator(
     private val input: List<Int> = listOf(),
     raw: List<String>,
-    private val logging: Boolean = false,
-    private val timeout: Long = 1
+    private val logging: Boolean,
+    private val timeout: Long,
+    private val numOfLinesLogged: Int
 ) {
     private val instructions: List<Command> = raw.mapIndexed { index, it -> compileInstruction(it, index) }
-    var executedInstructions: MutableList<Command> = mutableListOf()
-    val output = mutableListOf<Int>()
+    private var executedInstructions: MutableList<Command> = mutableListOf()
 
-    private var instructionPointer = 1
-    private var inputPointer = 0
+    private var instructionPointer = 1 // instruction pointer is basically the line number
+    private var inputPointer = 0 // input pointer is the index of the input list
+
+    var output = mutableListOf<Int>() // The output values of the simulator
+        private set
 
     private fun compileInstruction(input: String, index: Int): Command {
         val parts = input.split(Regex("\\s+")).toMutableList()
@@ -45,46 +56,61 @@ class RAMSimulator(
         return Command(instruction, operand, index + 1, this)
     }
 
+    private fun log() {
+        var linesPrinted = 0
+
+        println("\u001B[33m$Register")
+        println()
+        linesPrinted += 2
+
+        for (i in (executedInstructions.size - numOfLinesLogged until executedInstructions.size)) {
+            try {
+                val color = when (i - (executedInstructions.size - numOfLinesLogged)) {
+                    numOfLinesLogged - 1 -> "\u001B[34m"
+                    numOfLinesLogged - 2 -> "\u001B[32m"
+                    else -> "\u001B[0m"
+                }
+
+                println("$color${executedInstructions[i]}")
+                linesPrinted++
+            } catch (_: IndexOutOfBoundsException) {
+                println()
+                linesPrinted++
+            }
+        }
+
+        Thread.sleep(timeout * 1000)
+        repeat(linesPrinted) {
+            print("\u001B[1A") // Move cursor one line up
+            print("\u001B[2K") // Delete line
+        }
+    }
+
+    /**
+     * Executes the next instruction at the position of the instruction pointer.
+     */
     fun execute() {
         val command = instructions.getOrNull(instructionPointer - 1)
             ?: throw SimulatorException("No instruction found at line $instructionPointer")
 
         executedInstructions.add(command)
 
-        if(logging) {
-            var linesPrinted = 0
-
-            println("\u001B[33m$Register")
-            println()
-            linesPrinted += 2
-
-            repeat(5) {
-                val i = executedInstructions.size  - 5 + it
-                try {
-                    val color = when (it) {
-                        4 -> "\u001B[34m"
-                        3 -> "\u001B[32m"
-                        else -> "\u001B[0m"
-                    }
-
-                    println("$color${executedInstructions[i]}")
-                    linesPrinted++
-                } catch (_: IndexOutOfBoundsException) { }
-            }
-
-            Thread.sleep(timeout * 1000)
-            repeat(linesPrinted) {
-                print("\u001B[1A") // Cursor eine Zeile nach oben bewegen
-                print("\u001B[2K") // Zeile löschen
-            }
-        }
+        if (logging) log()
 
         command.execute()
 
         instructionPointer++
     }
 
+    /**
+     * Checks if the simulator has stopped executing. This is the case if the instruction pointer is at 0.
+     */
     fun isStopped() = instructionPointer == 0
+
+    /*
+     * The following functions are the implementations of the instructions. They are more deeply explained in the
+     * documentation of the model.Instruction enum.
+     */
 
     fun read(input: Operand) {
         if (input.dereferenceCount > 0) throw IllegalArgumentException("No dereferencing allowed for READ")

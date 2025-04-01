@@ -2,6 +2,15 @@ package model
 
 import service.RAMSimulator
 
+/**
+ * Represents a command in the RAM simulator. A command is composed of an instruction and an operand.
+ * The command is executed on the an instance of a RAM simulator.
+ *
+ * @param instruction the instruction to execute.
+ * @param operand the operand to use in the instruction.
+ * @param line the line number of the command.
+ * @param simulator the RAM simulator to execute the command on.
+ */
 data class Command(
     val instruction: Instruction,
     val operand: Operand,

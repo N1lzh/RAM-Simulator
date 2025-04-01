@@ -5,6 +5,7 @@ import service.RAMSimulator
 data class Command(
     val instruction: Instruction,
     val operand: Operand,
+    val line: Int,
     private val simulator: RAMSimulator
 ) {
     fun execute() {
@@ -24,5 +25,5 @@ data class Command(
         }
     }
 
-    override fun toString() = "$instruction $operand"
+    override fun toString() = "$line: $instruction $operand"
 }

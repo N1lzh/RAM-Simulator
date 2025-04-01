@@ -10,7 +10,7 @@ A simple RAM (Random-Access Machine) Simulator in Console written in Kotlin.
 1. Clone the repository
 2. Compile the project with something like `kotlinc $(find src/main/kotlin -name "*.kt") -include-runtime -d main.jar`
 3. Run the project with `kotlin -classpath main.jar MainKt`
-4. Follow the instructions in the console
+4. Follow the instructions in the console. File paths need to be specified from the content root. Best option is to put all your program.txts into `src/main/resources`.
 
 **NOTE:** This explains how to compile and run the project via console. You can also do all of this directly in IntelliJ IDEA.
 

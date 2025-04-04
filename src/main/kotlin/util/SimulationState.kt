@@ -1,5 +1,6 @@
 package util
 
+import model.Command
 import model.Register
 
 /**
@@ -11,6 +12,7 @@ data class SimulationState (
     val inputPointer: Int,
     val output: List<Int>,
     val registers: Map<Int, Int>,
+    val currentCommand: Command,
 ) {
     companion object {
         /**
@@ -22,11 +24,25 @@ data class SimulationState (
          *
          * @return A new SimulatorState object.
          */
-        fun fromCurrentState(instructionPointer: Int, inputPointer: Int, output: List<Int>) = SimulationState(
+        fun fromCurrentState(
+            instructionPointer: Int,
+            inputPointer: Int,
+            output: List<Int>,
+            currentCommand: Command
+        ) = SimulationState(
             instructionPointer = instructionPointer,
             inputPointer = inputPointer,
-            output = output,
-            registers = Register.registers,
+            output = output.toList(),
+            registers = Register.registers.toMap(),
+            currentCommand = currentCommand,
         )
+    }
+
+    override fun toString(): String {
+        return "{instructionPointer=$instructionPointer, " +
+                "inputPointer=$inputPointer, " +
+                "output=$output, " +
+                "registers=$registers, " +
+                "currentCommand=$currentCommand}"
     }
 }

@@ -64,14 +64,14 @@ class RAMSimulator(
         val command = instructions.getOrNull(instructionPointer - 1)
             ?: throw SimulatorException("No instruction found at line $instructionPointer")
 
-        stateHistory.add(SimulationState.fromCurrentState(instructionPointer, inputPointer, output))
+        stateHistory.add(SimulationState.fromCurrentState(instructionPointer, inputPointer, output, command))
 
         if (stateHistory.size > config.maxInstructions)
             throw SimulatorException("Number of executed instructions exceeded limit: ${config.maxInstructions}")
 
-        if (config.logging) debugger.log()
+        if (config.logging) debugger.displayAndProcess()
 
-        command.execute()
+        stateHistory.last().currentCommand.execute()
 
         instructionPointer++
     }
@@ -121,13 +121,20 @@ class RAMSimulator(
         }
     }
 
+    /*
+     * TODO: Refactor and move this to a separate class (maybe)
+     *  - especially the suspendUntil and rollback methods need some refactoring
+     */
     inner class Debugger {
-        private var linesPrinted = 0
+        private val sb = StringBuilder()
+        private var suspendedUntil = -1
 
-        fun log() {
-            println("\u001B[33m$Register")
-            println()
-            linesPrinted += 2
+        fun displayAndProcess() {
+            clearLines()
+
+            if (suspendedUntil > stateHistory.last().currentCommand.line || suspendedUntil == 0) return else suspendedUntil = -1
+
+            sb.appendLine("\u001B[33m$Register").appendLine()
 
             for (i in (stateHistory.size - config.numOfLinesLogged until stateHistory.size)) {
                 try {
@@ -137,60 +144,137 @@ class RAMSimulator(
                         else -> "\u001B[0m"
                     }
 
-                    println("$color${instructions[i]}")
-                    linesPrinted++
+                    sb.appendLine("$color${stateHistory[i].currentCommand}")
                 } catch (_: IndexOutOfBoundsException) {
-                    println()
-                    linesPrinted++
+                    sb.appendLine()
                 }
             }
 
-            var commandInput = ""
+            sb.appendLine()
+
             if(config.debug) {
-                println("\n\u001B[0mPress Enter to continue or input a command... For a list of commands, type 'help'")
-                commandInput = readln()
-                linesPrinted += 3 //? Is +3 right?
+                sb.appendLine("\u001B[0mPress Enter to continue or input a command... For a list of commands, type 'help'")
             } else {
                 Thread.sleep(config.timeout * 1000)
             }
+
+            print(sb.toString())
+            val commandInput = if (config.debug) readln() else ""
 
             clearLines()
             parseCommand(commandInput)
         }
 
-        private fun clearLines(linesToClear: Int = linesPrinted) {
-            repeat(linesToClear) {
-                print("\u001B[1A") // Move cursor one line up
-                print("\u001B[2K") // Delete line
-            }
-            linesPrinted -= linesToClear
+        private fun clearLines() {
+            print("\u001B[H\u001B[2J") // Clear the entire screen
+            sb.clear()
         }
 
         private fun parseCommand(input: String) {
-            when (input.lowercase()) {
+
+            val parts = input.split(Regex("\\s+")).toMutableList()
+            when (parts[0].lowercase()) {
                 "help" -> help()
                 "exit" -> exitProcess(0)
-                "rollback" -> TODO()
-                "reset" -> TODO()
-                "state" -> TODO()
+                "continue" -> suspendUntil(0)
+                "reset" -> rollback(0)
+                "states" -> states()
+                "rollback" -> rollback(parts[1].toIntOrNull())
+                "suspenduntil" -> suspendUntil(parts[1].toIntOrNull())
                 else -> return
             }
         }
 
         private fun help() {
-            println("Available commands:")
-            println("help - Show this help message")
-            println("exit - Exit the simulator")
-            println("rollback - Rollback to a previous state")
-            println("reset - Reset the simulator")
-            println("state - Show the current state of the simulator")
-            println("\nPress Enter to exit...")
+            sb.appendLine("Available commands:")
+            sb.appendLine("help - Show this help message")
+            sb.appendLine("exit - Exit the simulator")
+            sb.appendLine("continue - Continues the simulator until the end without logging")
+            sb.appendLine("reset - Reset the simulator")
+            sb.appendLine("states - Show the previous states with their indexes")
+            sb.appendLine("rollback - Rollback to a previous state by index")
+            sb.appendLine("\nPress Enter to exit...")
+
+            print(sb.toString())
             readln()
-            linesPrinted += 10
 
-            clearLines(linesPrinted)
+            displayAndProcess()
+        }
 
-            log()
+        private fun states() {
+            sb.appendLine("Previous states:")
+            stateHistory.forEachIndexed { index, state ->
+                sb.appendLine("$index: $state")
+            }
+            sb.appendLine("\nPress Enter to exit...")
+
+            print(sb.toString())
+            readln()
+
+            displayAndProcess()
+        }
+
+        private fun rollback(index: Int?) {
+            if (index == null || index < 0 || index >= stateHistory.size) {
+                sb.appendLine("Invalid index: $index")
+                sb.appendLine("\nPress Enter to exit...")
+
+                print(sb.toString())
+                readln()
+
+                displayAndProcess()
+
+                return
+            }
+
+            val state = stateHistory[index]
+            stateHistory = stateHistory.subList(0, index + 1)
+            instructionPointer = state.instructionPointer
+            inputPointer = state.inputPointer
+            output = state.output.toMutableList()
+            Register.rollback(state.registers)
+
+            sb.appendLine("Rolled back to state $index")
+            sb.appendLine("Current state: $state")
+            sb.appendLine("\nPress Enter to exit...")
+
+            print(sb.toString())
+            readln()
+
+            displayAndProcess()
+        }
+
+        private fun suspendUntil(index: Int?) {
+            val line = instructions.getOrNull((index?.minus(1)) ?: -1)
+            if (line == null && index != 0) {
+                sb.appendLine("Invalid line: $index")
+                sb.appendLine("\nPress Enter to exit...")
+
+                print(sb.toString())
+                readln()
+
+                displayAndProcess()
+
+                return
+            }
+
+            sb.appendLine("Are you sure you want to suspend until line $index? (y/n)")
+            println(sb.toString())
+            val answer = readln().lowercase()
+
+            sb.clear()
+
+            if (answer.startsWith("y")) {
+                suspendedUntil = index ?: -1
+                sb.appendLine("Suspended until line $index")
+            }
+
+            sb.appendLine("\nPress Enter to exit...")
+
+            print(sb.toString())
+            readln()
+
+            displayAndProcess()
         }
     }
 

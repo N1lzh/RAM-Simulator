@@ -39,7 +39,7 @@ fun main(args: Array<String>) {
     println("Please enter the input for your program, separated by commas:")
     val input = readln().split("\\s*,\\s*".toRegex()).map { e -> e.toInt() }
 
-    println("Starting Simulator with configurations {$config}\n")
+    println("Starting Simulator with $config\n")
     val simulator = RAMSimulator(
         input = input,
         raw = lines,

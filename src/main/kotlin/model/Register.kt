@@ -44,5 +44,15 @@ object Register {
      */
     fun storeAccumulator(index: Int) = registers.set(index, getAccumulator())
 
+    /**
+     * Rollback the registers to the previous state.
+     *
+     * @param registers the registers to rollback to.
+     */
+    fun rollback(registers: Map<Int, Int>) {
+        this.registers.clear()
+        this.registers.putAll(registers)
+    }
+
     override fun toString() = registers.toString()
 }

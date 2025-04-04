@@ -1,11 +1,11 @@
-package util
+package model
 
 /**
  * A register that stores integers. The register at index 0 is called the accumulator.
  * The Register is a singleton.
  */
 object Register {
-    private val registers: MutableMap<Int, Int> = mutableMapOf(0 to 0)
+    val registers: MutableMap<Int, Int> = mutableMapOf(0 to 0)
 
     /**
      * Gets the value at the specified index.

@@ -4,27 +4,28 @@ import exceptions.InvalidInstructionException
 import exceptions.InvalidOperandException
 import exceptions.SimulatorException
 import model.Command
+import util.Config
 import model.Instruction
 import model.Operand
-import util.Register
+import model.Register
+import util.SimulationState
+import kotlin.system.exitProcess
 
 /**
  * A simulator for the RAM.
  *
  * @param input The input values to use.
  * @param raw The raw instructions to compile.
- * @param logging Whether to log the state of the simulator.
- * @param timeout The timeout between logging in seconds.
+ * @param config The configuration for the simulator.
  */
 class RAMSimulator(
     private val input: List<Int> = listOf(),
     raw: List<String>,
-    private val logging: Boolean,
-    private val timeout: Long,
-    private val numOfLinesLogged: Int
+    private val config: Config,
 ) {
     private val instructions: List<Command> = raw.mapIndexed { index, it -> compileInstruction(it, index) }
-    private var executedInstructions: MutableList<Command> = mutableListOf()
+    private var stateHistory: MutableList<SimulationState> = mutableListOf()
+    private val debugger = Debugger()
 
     private var instructionPointer = 1 // instruction pointer is basically the line number
     private var inputPointer = 0 // input pointer is the index of the input list
@@ -56,36 +57,6 @@ class RAMSimulator(
         return Command(instruction, operand, index + 1, this)
     }
 
-    private fun log() {
-        var linesPrinted = 0
-
-        println("\u001B[33m$Register")
-        println()
-        linesPrinted += 2
-
-        for (i in (executedInstructions.size - numOfLinesLogged until executedInstructions.size)) {
-            try {
-                val color = when (i - (executedInstructions.size - numOfLinesLogged)) {
-                    numOfLinesLogged - 1 -> "\u001B[34m"
-                    numOfLinesLogged - 2 -> "\u001B[32m"
-                    else -> "\u001B[0m"
-                }
-
-                println("$color${executedInstructions[i]}")
-                linesPrinted++
-            } catch (_: IndexOutOfBoundsException) {
-                println()
-                linesPrinted++
-            }
-        }
-
-        Thread.sleep(timeout * 1000)
-        repeat(linesPrinted) {
-            print("\u001B[1A") // Move cursor one line up
-            print("\u001B[2K") // Delete line
-        }
-    }
-
     /**
      * Executes the next instruction at the position of the instruction pointer.
      */
@@ -93,9 +64,12 @@ class RAMSimulator(
         val command = instructions.getOrNull(instructionPointer - 1)
             ?: throw SimulatorException("No instruction found at line $instructionPointer")
 
-        executedInstructions.add(command)
+        stateHistory.add(SimulationState.fromCurrentState(instructionPointer, inputPointer, output))
 
-        if (logging) log()
+        if (stateHistory.size > config.maxInstructions)
+            throw SimulatorException("Number of executed instructions exceeded limit: ${config.maxInstructions}")
+
+        if (config.logging) debugger.log()
 
         command.execute()
 
@@ -146,4 +120,79 @@ class RAMSimulator(
             instructionPointer = input.index - 1
         }
     }
+
+    inner class Debugger {
+        private var linesPrinted = 0
+
+        fun log() {
+            println("\u001B[33m$Register")
+            println()
+            linesPrinted += 2
+
+            for (i in (stateHistory.size - config.numOfLinesLogged until stateHistory.size)) {
+                try {
+                    val color = when (i - (stateHistory.size - config.numOfLinesLogged)) {
+                        config.numOfLinesLogged - 1 -> "\u001B[34m"
+                        config.numOfLinesLogged - 2 -> "\u001B[32m"
+                        else -> "\u001B[0m"
+                    }
+
+                    println("$color${instructions[i]}")
+                    linesPrinted++
+                } catch (_: IndexOutOfBoundsException) {
+                    println()
+                    linesPrinted++
+                }
+            }
+
+            var commandInput = ""
+            if(config.debug) {
+                println("\n\u001B[0mPress Enter to continue or input a command... For a list of commands, type 'help'")
+                commandInput = readln()
+                linesPrinted += 3 //? Is +3 right?
+            } else {
+                Thread.sleep(config.timeout * 1000)
+            }
+
+            clearLines()
+            parseCommand(commandInput)
+        }
+
+        private fun clearLines(linesToClear: Int = linesPrinted) {
+            repeat(linesToClear) {
+                print("\u001B[1A") // Move cursor one line up
+                print("\u001B[2K") // Delete line
+            }
+            linesPrinted -= linesToClear
+        }
+
+        private fun parseCommand(input: String) {
+            when (input.lowercase()) {
+                "help" -> help()
+                "exit" -> exitProcess(0)
+                "rollback" -> TODO()
+                "reset" -> TODO()
+                "state" -> TODO()
+                else -> return
+            }
+        }
+
+        private fun help() {
+            println("Available commands:")
+            println("help - Show this help message")
+            println("exit - Exit the simulator")
+            println("rollback - Rollback to a previous state")
+            println("reset - Reset the simulator")
+            println("state - Show the current state of the simulator")
+            println("\nPress Enter to exit...")
+            readln()
+            linesPrinted += 10
+
+            clearLines(linesPrinted)
+
+            log()
+        }
+    }
+
+
 }

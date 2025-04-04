@@ -1,7 +1,6 @@
 package model
 
 import exceptions.InvalidOperandException
-import util.Register
 
 /**
  * An operand for the RAM. Can be a literal or a reference to a register.

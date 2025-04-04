@@ -1,3 +1,4 @@
+import util.Config
 import java.nio.file.Files
 import java.nio.file.Paths
 import service.RAMSimulator
@@ -19,9 +20,13 @@ fun main(args: Array<String>) {
         properties.load(inputStream)
     }
 
-    val logging = properties.getProperty("logging").toBoolean()
-    val timeout = properties.getProperty("timeout").toLong()
-    val numOfLinesLogged = properties.getProperty("numOfLinesLogged").toInt()
+    val config = Config(
+        maxInstructions = properties.getProperty("maxInstructions").toInt(),
+        logging = properties.getProperty("logging").toBoolean(),
+        debug = properties.getProperty("debug").toBoolean(),
+        timeout = properties.getProperty("timeout").toLong(),
+        numOfLinesLogged = properties.getProperty("numOfLinesLogged").toInt(),
+    )
 
     val filePath = if (args.isEmpty() || args[0].isEmpty()) {
         println("Please specify a path to your txt file:")
@@ -34,13 +39,11 @@ fun main(args: Array<String>) {
     println("Please enter the input for your program, separated by commas:")
     val input = readln().split("\\s*,\\s*".toRegex()).map { e -> e.toInt() }
 
-    println("Starting Simulator with configurations {logging = $logging, timeout = $timeout}\n")
+    println("Starting Simulator with configurations {$config}\n")
     val simulator = RAMSimulator(
         input = input,
         raw = lines,
-        logging = logging,
-        timeout = timeout,
-        numOfLinesLogged = numOfLinesLogged
+        config = config,
     )
 
     while (!simulator.isStopped()) {
